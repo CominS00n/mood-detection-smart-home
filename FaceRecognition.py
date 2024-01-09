@@ -6,6 +6,10 @@ from pathlib import Path
 
 import torch
 import requests
+import time
+
+import pyautogui
+from PIL import ImageGrab
 
 FILE = Path(__file__).resolve()
 ROOT = FILE.parents[0]
@@ -22,14 +26,30 @@ from utils.general import (LOGGER, Profile, check_file, check_img_size, check_im
 from utils.torch_utils import select_device, smart_inference_mode
 from EmotionDetector import run_emotion_detector
 
-def send_line_notify(message, access_token):
+def send_line_notify(message, access_token, image_path=None):
     url = "https://notify-api.line.me/api/notify"
     headers = {
         "Authorization": "Bearer " + access_token,
-        "Content-Type": "application/x-www-form-urlencoded",
     }
+
     payload = {"message": message}
-    requests.post(url, headers=headers, data=payload)
+    if image_path:
+        files = {'imageFile': open(image_path, 'rb')}
+        response = requests.post(url, headers=headers, data=payload, files=files)
+    else:
+        response = requests.post(url, headers=headers, data=payload)
+    return response
+
+def capture_and_notify(message, access_token):
+    # Capture screenshot using pyautogui
+    screenshot = pyautogui.screenshot()
+    
+    # Save screenshot to a file
+    screenshot_path = "screenshot.png"
+    screenshot.save(screenshot_path)
+
+    # Send Line Notify with the screenshot
+    send_line_notify(message, access_token, image_path=screenshot_path)
 
 @smart_inference_mode()
 def run(
@@ -129,7 +149,7 @@ def run(
                         run_emotion_detector()
                         sys.exit()
                     else:
-                        send_line_notify("Visitor detected!", "HSSUNQN0qA1e1eojmelG7zSWXcD2GSJ8DAoyRLTCeZi")
+                        capture_and_notify("Visitor detected!", "HSSUNQN0qA1e1eojmelG7zSWXcD2GSJ8DAoyRLTCeZi")
 
             # Stream results
             im0 = annotator.result()

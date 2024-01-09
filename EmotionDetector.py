@@ -2,6 +2,7 @@ import cv2
 import numpy as np
 from keras.models import model_from_json
 import time
+from yeelight import Bulb, discover_bulbs
 
 def run_emotion_detector():
     emotion_dict = {0: "Angry", 1: "Happy", 2: "Neutral", 3: "Sad", 4: "Surprised"}
@@ -21,6 +22,18 @@ def run_emotion_detector():
 
     start_time = time.time()
     duration = 5
+
+    bulbs = discover_bulbs()
+
+    # for bulb_info in bulbs:
+    #     ip = bulb_info["ip"]
+    #     port = bulb_info["port"]
+    #     print("IP: {0}, Port: {1}".format(ip, port))
+    
+    # selected_bulb = bulbs[0]
+    bulb_ip = "192.168.1.119"
+    bulb = Bulb(bulb_ip)
+
 
     while time.time() - start_time <= duration:
         # Find haar cascade to draw bounding box around face
@@ -47,14 +60,27 @@ def run_emotion_detector():
             # Check if the detected emotion
             if emotion_dict[maxindex] == "Angry":
                 print("open blue light #29C5F6")
+                bulb.turn_on()
+                bulb.set_rgb(41, 197, 246)
+                bulb.set_brightness(50)
             elif emotion_dict[maxindex] == "Happy":
                 print("open orange light #E67E22")
+                bulb.turn_on()
+                bulb.set_rgb(230, 126, 34)
+                bulb.set_brightness(50)
             elif emotion_dict[maxindex] == "Neutral":
                 print("off light")
+                bulb.turn_off()
             elif emotion_dict[maxindex] == "Sad":
                 print("open green light #27AE60")
+                bulb.turn_on()
+                bulb.set_rgb(39, 174, 96)
+                bulb.set_brightness(50)
             elif emotion_dict[maxindex] == "Surprised":
                 print("open yellow light #F4D03F")
+                bulb.turn_on()
+                bulb.set_rgb(244, 208, 63)
+                bulb.set_brightness(50)
                 
             cv2.putText(frame, emotion_dict[maxindex], (x+5, y-20), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2, cv2.LINE_AA)
 
