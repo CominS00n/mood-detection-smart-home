@@ -8,13 +8,13 @@ def run_emotion_detector():
     emotion_dict = {0: "Angry", 1: "Happy", 2: "Neutral", 3: "Sad", 4: "Surprised"}
 
     # load json and create model
-    json_file = open('emotion_model.json', 'r')
+    json_file = open('models/emotion/emotion_model.json', 'r')
     loaded_model_json = json_file.read()
     json_file.close()
     emotion_model = model_from_json(loaded_model_json)
 
     # load weights into new model
-    emotion_model.load_weights("emotion_model.h5")
+    emotion_model.load_weights("models/emotion/emotion_model.h5")
     print("Loaded model from disk")
 
     # start the webcam feed

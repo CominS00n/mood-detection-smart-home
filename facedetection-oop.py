@@ -3,7 +3,12 @@ import os
 import platform
 import sys
 from pathlib import Path
+
 import torch
+import numpy as np
+from keras.models import model_from_json
+from yeelight import Bulb, discover_bulbs
+
 from ultralytics.utils.plotting import Annotator, colors, save_one_box
 from models.common import DetectMultiBackend
 from utils.dataloaders import IMG_FORMATS, VID_FORMATS, LoadImages, LoadScreenshots, LoadStreams
@@ -16,7 +21,7 @@ if str(ROOT) not in sys.path:
     sys.path.append(str(ROOT))  # add ROOT to PATH
 ROOT = Path(os.path.relpath(ROOT, Path.cwd()))  # relative
 
-class ObjectDetector:
+class FaceDetector:
     def __init__(self, weights, source, data, imgsz, conf_thres, iou_thres, max_det, device, classes, agnostic_nms, augment, visualize, update, line_thickness, hide_labels, hide_conf, half, dnn, vid_stride):
         self.weights = weights
         self.source = source
@@ -127,6 +132,11 @@ class ObjectDetector:
         if self.update:
             strip_optimizer(self.weights[0])
 
+# class EmotionDetector:
+#     def run(self):
+#         emotion_dict = {0: "Angry", 1: "Happy", 2: "Neutral", 3: "Sad", 4: "Surprised"}
+#     pass
+
 def parse_opt():
     parser = argparse.ArgumentParser()
     parser.add_argument('--weights', nargs='+', type=str, default=ROOT / 'vMembers_v2.pt', help='model path or triton URL')
@@ -155,8 +165,8 @@ def parse_opt():
 
 def main(opt):
     check_requirements(ROOT / 'requirements.txt', exclude=('tensorboard', 'thop'))
-    detector = ObjectDetector(opt.weights, opt.source, opt.data, opt.imgsz, opt.conf_thres, opt.iou_thres, opt.max_det, opt.device, opt.classes, opt.agnostic_nms, opt.augment, opt.visualize, opt.update, opt.line_thickness, opt.hide_labels, opt.hide_conf, opt.half, opt.dnn, opt.vid_stride)
-    detector.run()
+    faceDetector = FaceDetector(opt.weights, opt.source, opt.data, opt.imgsz, opt.conf_thres, opt.iou_thres, opt.max_det, opt.device, opt.classes, opt.agnostic_nms, opt.augment, opt.visualize, opt.update, opt.line_thickness, opt.hide_labels, opt.hide_conf, opt.half, opt.dnn, opt.vid_stride)
+    faceDetector.run()
 
 if __name__ == '__main__':
     opt = parse_opt()
