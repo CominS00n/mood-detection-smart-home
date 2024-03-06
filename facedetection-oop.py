@@ -5,9 +5,14 @@ import sys
 from pathlib import Path
 
 import torch
+
+import cv2
 import numpy as np
 from keras.models import model_from_json
 from yeelight import Bulb, discover_bulbs
+import time
+
+import threading
 
 from ultralytics.utils.plotting import Annotator, colors, save_one_box
 from models.common import DetectMultiBackend
@@ -20,7 +25,6 @@ ROOT = FILE.parents[0]  # YOLOv5 root directory
 if str(ROOT) not in sys.path:
     sys.path.append(str(ROOT))  # add ROOT to PATH
 ROOT = Path(os.path.relpath(ROOT, Path.cwd()))  # relative
-
 class FaceDetector:
     def __init__(self, weights, source, data, imgsz, conf_thres, iou_thres, max_det, device, classes, agnostic_nms, augment, visualize, update, line_thickness, hide_labels, hide_conf, half, dnn, vid_stride):
         self.weights = weights
@@ -45,6 +49,7 @@ class FaceDetector:
         self.half = half
         self.dnn = dnn
         self.vid_stride = vid_stride
+        # self.stop_webcam = False
 
     @smart_inference_mode()
     def run(self):
@@ -75,7 +80,13 @@ class FaceDetector:
 
         model.warmup(imgsz=(1 if pt or model.triton else bs, 3, *imgsz))
         seen, windows, dt = 0, [], (Profile(), Profile(), Profile())
+
+        # start_time = time.time()
+        # duration = 3
         for path, im, im0s, vid_cap, s in dataset:
+            # if self.stop_webcam or time.time() - start_time >= duration:
+            #     self.cap.release()
+            #     break
             with dt[0]:
                 im = torch.from_numpy(im).to(model.device)
                 im = im.half() if model.fp16 else im.float()
@@ -111,6 +122,15 @@ class FaceDetector:
                         c = int(cls)
                         label = names[c] if self.hide_conf else f'{names[c]}'
 
+                        if names[int(c)] == 'visitor':
+                            print("Visitor detected! Take appropriate action.")
+                        else:
+                            # self.stop_webcam = True
+                            emotion_detector = EmotionDetector()
+                            emotion_detector.run(duration=3)
+                            emotion_detector.process_emotion_array()
+                            # break
+
                         if save_img or self.save_crop or self.view_img:
                             c = int(cls)
                             label = None if self.hide_labels else (names[c] if self.hide_conf else f'{names[c]} {conf:.2f}')
@@ -121,21 +141,113 @@ class FaceDetector:
                     if platform.system() == 'Linux' and p not in windows:
                         windows.append(p)
                         cv2.namedWindow(str(p), cv2.WINDOW_NORMAL | cv2.WINDOW_KEEPRATIO)
-                        cv2.resizeWindow(str(p), im0.shape[1], im0.shape[0])
+                        cv2.resizeWindow(str(p), im0.shape[0], im0.shape[0])
                     cv2.imshow(str(p), im0)
                     cv2.waitKey(1)
 
             LOGGER.info(f"{s}{'' if len(det) else '(no detections), '}{dt[1].dt * 1E3:.1f}ms")
+        cv2.destroyAllWindows()
 
         t = tuple(x.t / seen * 1E3 for x in dt)
         LOGGER.info(f'Speed: %.1fms pre-process, %.1fms inference, %.1fms NMS per image at shape {(1, 3, *imgsz)}' % t)
         if self.update:
             strip_optimizer(self.weights[0])
 
-# class EmotionDetector:
-#     def run(self):
-#         emotion_dict = {0: "Angry", 1: "Happy", 2: "Neutral", 3: "Sad", 4: "Surprised"}
-#     pass
+class EmotionDetector:
+    max_emotion_array = []
+
+    def __init__(self):
+        self.emotion_dict = {0: "Angry", 1: "Happy", 2: "Neutral", 3: "Sad", 4: "Surprised"}
+        self.load_emotion_model()
+        self.cap = cv2.VideoCapture(0)
+        self.bulb = Bulb("192.168.1.119")  # Replace with your bulb's IP address
+        self.emotion_array_list = []
+        self.start_time = time.time()
+    
+    def load_emotion_model(self):
+        json_file = open('models/emotion/emotion_model.json', 'r')
+        loaded_model_json = json_file.read()
+        json_file.close()
+        self.emotion_model = model_from_json(loaded_model_json)
+        self.emotion_model.load_weights("models/emotion/emotion_model.h5")
+        print("Loaded model from disk")
+
+    def detect_emotion(self, frame, duration):
+        face_detector = cv2.CascadeClassifier('haarcascades/haarcascade_frontalface_default.xml')
+        gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        num_faces = face_detector.detectMultiScale(gray_frame, scaleFactor=1.3, minNeighbors=5)
+
+        for (x, y, w, h) in num_faces:
+            cv2.rectangle(frame, (x, y-50), (x+w, y+h+10), (0, 255, 0), 4)
+            roi_gray_frame = gray_frame[y:y + h, x:x + w]
+            cropped_img = np.expand_dims(np.expand_dims(cv2.resize(roi_gray_frame, (48, 48)), -1), 0)
+            emotion_prediction = self.emotion_model.predict(cropped_img)
+            maxindex = int(np.argmax(emotion_prediction))
+            self.emotion_array_list.append(emotion_prediction[0].tolist())
+
+            elapsed_time = time.time() - self.start_time
+
+            if elapsed_time >= duration:
+                max_emotion_array = max(self.emotion_array_list, key=lambda x: x[0])
+                maxindex = max_emotion_array.index(max(max_emotion_array))
+
+                # ทำงานกับ max_emotion_array ตามที่คุณต้องการ
+                self.process_emotion_array(max_emotion_array)
+
+                # รีเซ็ตค่า emotion_array_list และ start_time เพื่อให้เริ่มนับใหม่ในรอบถัดไป
+                self.emotion_array_list = []
+                self.start_time = time.time()
+            cv2.putText(frame, self.emotion_dict[maxindex], (x+5, y-20), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2, cv2.LINE_AA)
+
+        return frame
+    
+    def process_emotion_array(self, max_emotion_array):
+        maxindex = max_emotion_array.index(max(max_emotion_array))
+        emotion_label = self.emotion_dict[maxindex]
+        if emotion_label == "Angry":
+            self.set_bulb_color(41, 197, 246)  # Blue
+            print("open blue light #29C5F6")
+        elif emotion_label == "Happy":
+            self.set_bulb_color(230, 126, 34)  # Orange
+            print("open orange light #E67E22")
+        elif emotion_label == "Neutral":
+            self.bulb.turn_off()
+            print("off light")
+        elif emotion_label == "Sad":
+            self.set_bulb_color(39, 174, 96)  # Green
+            print("open green light #27AE60")
+        elif emotion_label == "Surprised":
+            self.set_bulb_color(244, 208, 63)  # Yellow
+            print("open yellow light #F4D03F")
+        else:
+            print(f"Unknown emotion label: {emotion_label}")
+
+    def set_bulb_color(self, r, g, b):
+        print(f"Setting bulb color: R={r}, G={g}, B={b}")
+        self.bulb.turn_on()
+        self.bulb.set_rgb(r, g, b)
+        self.bulb.set_brightness(50)
+
+    def run(self, duration=3):
+        start_time = time.time()
+
+        while time.time() - start_time < duration:
+            ret, frame = self.cap.read()
+            frame = cv2.resize(frame, (720, 480))
+            if not ret:
+                break
+
+            frame = self.detect_emotion(frame, duration)
+            cv2.imshow('Emotion Detection', frame)
+
+            if cv2.waitKey(1) & 0xFF == ord('q'):
+                break
+        self.cap.release()
+        max_emotion_array = max(self.emotion_array_list, key=lambda x: x[0])
+        self.process_emotion_array(max_emotion_array)
+
+    
+
 
 def parse_opt():
     parser = argparse.ArgumentParser()

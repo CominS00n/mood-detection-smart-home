@@ -88,8 +88,3 @@ def run_emotion_detector():
 
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
-
-    from FaceRecognition import run
-    run()
-    cap.release()
-    cv2.destroyAllWindows()

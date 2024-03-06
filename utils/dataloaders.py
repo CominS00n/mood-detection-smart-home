@@ -400,7 +400,7 @@ class LoadStreams:
                     self.imgs[i] = np.zeros_like(self.imgs[i])
                     cap.open(stream)  # re-open stream if signal was lost
             time.sleep(0.0)  # wait time
-
+    
     def __iter__(self):
         self.count = -1
         return self
