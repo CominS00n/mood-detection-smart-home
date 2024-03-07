@@ -43,8 +43,6 @@ def main(opt):
     check_requirements(ROOT / 'requirements.txt', exclude=('tensorboard', 'thop'))
     faceDetector = FaceDetector(opt.weights, opt.source, opt.data, opt.imgsz, opt.conf_thres, opt.iou_thres, opt.max_det, opt.device, opt.classes, opt.agnostic_nms, opt.augment, opt.visualize, opt.update, opt.line_thickness, opt.hide_labels, opt.hide_conf, opt.half, opt.dnn, opt.vid_stride)
     faceDetector.run()
-    # emotionDetector = EmotionDetector()
-    # emotionDetector.run()
 
 if __name__ == '__main__':
     while True:
