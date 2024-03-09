@@ -9,16 +9,19 @@ from keras.models import model_from_json
 from yeelight import Bulb, discover_bulbs
 from collections import Counter
 import time
-import sys
+import random
+import requests
+import pygame
+import os
 
 from ultralytics.utils.plotting import Annotator, colors
 from models.common import DetectMultiBackend
 from utils.dataloaders import IMG_FORMATS, VID_FORMATS, LoadImages, LoadScreenshots, LoadStreams
-from utils.general import LOGGER, Profile, check_file, check_img_size, check_imshow,   cv2,  non_max_suppression,  scale_boxes, strip_optimizer
+from utils.general import LOGGER, Profile, check_file, check_img_size, check_imshow, cv2, non_max_suppression, scale_boxes, strip_optimizer
 from utils.torch_utils import select_device, smart_inference_mode
 
 class FaceDetector:
-    def __init__(self, weights, source, data, imgsz, conf_thres, iou_thres, max_det, device, classes, agnostic_nms, augment, visualize, update, line_thickness, hide_labels, hide_conf, half, dnn, vid_stride):
+    def __init__(self, weights, source, data, imgsz, conf_thres, iou_thres, max_det, device, classes, agnostic_nms, augment, visualize, update, line_thickness, hide_labels, hide_conf, half, dnn, vid_stride, line_notify):
         self.weights = weights
         self.source = source
         self.data = data
@@ -41,6 +44,7 @@ class FaceDetector:
         self.half = half
         self.dnn = dnn
         self.vid_stride = vid_stride
+        self.line_notify = line_notify
 
     @smart_inference_mode()
     def run(self):
@@ -73,6 +77,7 @@ class FaceDetector:
         seen, windows, dt = 0, [], (Profile(), Profile(), Profile())
 
         for path, im, im0s, vid_cap, s in dataset:
+
             with dt[0]:
                 im = torch.from_numpy(im).to(model.device)
                 im = im.half() if model.fp16 else im.float()
@@ -110,6 +115,14 @@ class FaceDetector:
 
                         if names[int(c)] == 'visitor':
                             print("Visitor detected! Take appropriate action.")
+
+                            current_time = time.time()
+                            elapsed_time = current_time - self.line_notify.last_notification_time
+                            if elapsed_time >= 300:
+                                cv2.imwrite('visitor_capture.jpg', im0)
+                                self.line_notify.send_message('Visitor detected! Take appropriate action.')
+                                self.line_notify.send_image('visitor_capture.jpg')
+                                self.line_notify.last_notification_time = current_time
                         else:
                             break
 
@@ -142,7 +155,6 @@ class FaceDetector:
         emotion_detector.run()
 
 class EmotionDetector:
-
     def __init__(self):
         self.emotion_dict = {0: "Angry", 1: "Happy", 2: "Neutral", 3: "Sad", 4: "Surprised"}
         self.load_emotion_model()
@@ -193,18 +205,30 @@ class EmotionDetector:
         if most_common_emotion == "Angry":
             self.set_bulb_color(41, 197, 246)  # Blue
             print("open blue light #29C5F6")
+            music_folder = "music/angry"
+            play_music = PlayMusic(music_folder)
+            play_music.play_random_song()
         elif most_common_emotion == "Happy":
             self.set_bulb_color(230, 126, 34)  # Orange
             print("open orange light #E67E22")
+            music_folder = "music/happy"
+            play_music = PlayMusic(music_folder)
+            play_music.play_random_song()
         elif most_common_emotion == "Neutral":
             self.bulb.turn_off()
             print("off light")
         elif most_common_emotion == "Sad":
             self.set_bulb_color(39, 174, 96)  # Green
             print("open green light #27AE60")
+            music_folder = "music/sad"
+            play_music = PlayMusic(music_folder)
+            play_music.play_random_song()
         elif most_common_emotion == "Surprised":
             self.set_bulb_color(244, 208, 63)  # Yellow
             print("open yellow light #F4D03F")
+            music_folder = "music/surprised"
+            play_music = PlayMusic(music_folder)
+            play_music.play_random_song()
         else:
             print(f"Unknown emotion label: {most_common_emotion}")
 
@@ -228,3 +252,51 @@ class EmotionDetector:
 
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
+
+class LineNotify:
+    def __init__(self, access_token):
+        self.access_token = access_token
+        self.api_url = 'https://notify-api.line.me/api/notify'
+        self.last_notification_time = 0  # Initialize the last notification time to 0
+
+    def send_message(self, message):
+        headers = {'Authorization': f'Bearer {self.access_token}'}
+        data = {'message': message}
+        response = requests.post(self.api_url, headers=headers, data=data)
+        
+        if response.status_code == 200:
+            print('Message sent successfully!')
+        else:
+            print(f'Error sending message. Status code: {response.status_code}, Response: {response.text}')
+
+    def send_image(self, image_path):
+        headers = {'Authorization': f'Bearer {self.access_token}'}
+        image_file = {'imageFile': (image_path, open(image_path, 'rb'), 'image/jpeg')}
+        response = requests.post(self.api_url, headers=headers, files=image_file)
+        
+        if response.status_code == 200:
+            print('Image sent successfully!')
+        else:
+            print(f'Error sending image. Status code: {response.status_code}, Response: {response.text}')
+
+class PlayMusic:
+    def __init__(self, folder_path):
+        self.folder_path = folder_path
+
+    def play_random_song(self):
+        songs = [file for file in os.listdir(self.folder_path) if file.endswith(('.mp3', '.wav', '.ogg'))]
+        if not songs:
+            print(f"No songs found in {self.folder_path}")
+            return
+
+        song_to_play = os.path.join(self.folder_path, random.choice(songs))
+        pygame.mixer.init()
+        pygame.mixer.music.load(song_to_play)
+        pygame.mixer.music.play()
+
+        # รอให้เพลงเล่นจนกว่าจะจบ
+        while pygame.mixer.music.get_busy():
+            continue
+
+        pygame.mixer.quit()
+        print(f"Song '{os.path.basename(song_to_play)}' has finished playing.")
