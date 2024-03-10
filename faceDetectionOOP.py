@@ -6,7 +6,7 @@ import torch
 import cv2
 import numpy as np
 from keras.models import model_from_json
-from yeelight import Bulb, discover_bulbs
+from yeelight import Bulb
 from collections import Counter
 import time
 import random
