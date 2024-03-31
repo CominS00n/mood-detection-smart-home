@@ -13,6 +13,7 @@ import random
 import requests
 import pygame
 import os
+import time
 
 from ultralytics.utils.plotting import Annotator, colors
 from models.common import DetectMultiBackend
@@ -142,8 +143,11 @@ class FaceDetector:
 
             LOGGER.info(f"{s}{'' if len(det) else '(no detections), '}{dt[1].dt * 1E3:.1f}ms")
             if 'visitor' not in s:
+                webcam = ''
+                cv2.destroyAllWindows()
                 break
         cv2.destroyAllWindows()
+        cv2.waitKey(1)
 
         t = tuple(x.t / seen * 1E3 for x in dt)
         LOGGER.info(f'Speed: %.1fms pre-process, %.1fms inference, %.1fms NMS per image at shape {(1, 3, *imgsz)}' % t)
@@ -151,8 +155,8 @@ class FaceDetector:
             strip_optimizer(self.weights[0])
 
         # Start EmotionDetector
-        emotion_detector = EmotionDetector()
-        emotion_detector.run()
+        # emotion_detector = EmotionDetector()
+        # emotion_detector.run()
 
 class EmotionDetector:
     def __init__(self):
@@ -239,12 +243,15 @@ class EmotionDetector:
         self.bulb.set_brightness(50)
 
     def run(self, duration=3):
+        # self.cap.release()
+        # self.cap = cv2.VideoCapture(0)
         start_time = time.time()
-
         while time.time() - start_time < duration:
             ret, frame = self.cap.read()
-            frame = cv2.resize(frame, (720, 480))
+            frame = cv2.resize(frame, (640, 480))
+
             if not ret:
+                LOGGER.error("Failed to read frame from the camera")
                 break
 
             frame = self.detect_emotion(frame, duration)

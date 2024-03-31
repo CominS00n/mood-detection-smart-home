@@ -1,12 +1,13 @@
 import argparse
 from utils.general import  check_requirements,  print_args
 
-from faceDetectionOOP import FaceDetector, LineNotify
+from faceDetectionOOP import FaceDetector, LineNotify, EmotionDetector
 from pathlib import Path
-import tensorflow as tf
+# import tensorflow as tf
 
 import sys
 import os
+import time
 
 FILE = Path(__file__).resolve()
 ROOT = FILE.parents[0]  # YOLOv5 root directory
@@ -41,11 +42,13 @@ def parse_opt():
     return opt
 
 def main(opt):
-    # check_requirements(ROOT / 'requirements.txt', exclude=('tensorboard', 'thop'))
-    # line_notify = LineNotify('HSSUNQN0qA1e1eojmelG7zSWXcD2GSJ8DAoyRLTCeZi')
-    # faceDetector = FaceDetector(opt.weights, opt.source, opt.data, opt.imgsz, opt.conf_thres, opt.iou_thres, opt.max_det, opt.device, opt.classes, opt.agnostic_nms, opt.augment, opt.visualize, opt.update, opt.line_thickness, opt.hide_labels, opt.hide_conf, opt.half, opt.dnn, opt.vid_stride, line_notify)
-    # faceDetector.run()
-    print(tf.__version__)
+    check_requirements(ROOT / 'requirements.txt', exclude=('tensorboard', 'thop'))
+    line_notify = LineNotify('HSSUNQN0qA1e1eojmelG7zSWXcD2GSJ8DAoyRLTCeZi')
+    faceDetector = FaceDetector(opt.weights, opt.source, opt.data, opt.imgsz, opt.conf_thres, opt.iou_thres, opt.max_det, opt.device, opt.classes, opt.agnostic_nms, opt.augment, opt.visualize, opt.update, opt.line_thickness, opt.hide_labels, opt.hide_conf, opt.half, opt.dnn, opt.vid_stride, line_notify)
+    faceDetector.run()
+    # time.sleep(10)
+    emotionDetector = EmotionDetector()
+    emotionDetector.run()
 
 if __name__ == '__main__':
     while True:
