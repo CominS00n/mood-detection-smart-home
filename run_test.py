@@ -43,7 +43,7 @@ def parse_opt():
 
 def main(opt):
     check_requirements(ROOT / 'requirements.txt', exclude=('tensorboard', 'thop'))
-    line_notify = LineNotify('HSSUNQN0qA1e1eojmelG7zSWXcD2GSJ8DAoyRLTCeZi')
+    line_notify = LineNotify('TOKEN')
     faceDetector = FaceDetector(opt.weights, opt.source, opt.data, opt.imgsz, opt.conf_thres, opt.iou_thres, opt.max_det, opt.device, opt.classes, opt.agnostic_nms, opt.augment, opt.visualize, opt.update, opt.line_thickness, opt.hide_labels, opt.hide_conf, opt.half, opt.dnn, opt.vid_stride, line_notify)
     faceDetector.run()
     # time.sleep(10)
